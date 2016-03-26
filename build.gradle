@@ -1,0 +1,105 @@
+// Build for a particular environment using `gradle -Penv=local build`
+
+buildscript {
+    repositories {
+        maven {
+            url "${artifactory_pluginsUrl}"
+            credentials {
+                username = "${artifactory_user}"
+                password = "${artifactory_password}"
+            }
+        }
+    }
+    dependencies {
+        //Check for the latest version here: http://plugins.gradle.org/plugin/com.jfrog.artifactory
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:3.1.1'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.artifactory'
+
+group 'io.metamorphic'
+version '1.0'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
+configurations {
+    provided
+    compile.extendsFrom provided
+}
+
+jar {
+    baseName = 'analysisservices'
+    version = '1.0'
+//    dependsOn configurations.runtime
+//    from {
+//        (configurations.runtime - configurations.provided).collect {
+//            it.isDirectory() ? it : zipTree(it)
+//        }
+//    }
+}
+
+artifactory {
+    contextUrl = "${artifactory_contextUrl}"   //The base Artifactory URL if not overridden by the publisher/resolver
+    publish {
+        repository {
+            repoKey = 'libs-release-local'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+        }
+        defaults {
+            publications ('mavenJava')
+        }
+    }
+    resolve {
+        repository {
+            repoKey = 'libs-release'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+        }
+    }
+}
+
+dependencies {
+    compile 'io.metamorphic:metamorphic-commons:1.0'
+    compile 'io.metamorphic:analysis-commons:1.0'
+    compile('org.eobjects.analyzerbeans:AnalyzerBeans-basic-analyzers:1.0.6') {
+        exclude group: 'net.sf.opencsv'
+
+        // AnalyzerBeans-core has a scala-library dependency
+        // otherwise ClassNotFoundException: scala.collection.GenTraversableOnce$class
+        exclude group: 'org.scala-lang', module: 'scala-library'
+    }
+    compile('org.eobjects.analyzerbeans:AnalyzerBeans-cli:1.0.6') {
+        // AnalyzerBeans-core has a scala-library dependency
+        // otherwise ClassNotFoundException: scala.collection.GenTraversableOnce$class
+        exclude group: 'org.scala-lang', module: 'scala-library'
+    }
+    compile 'org.scala-lang:scala-library:2.10.4'
+
+//    compile('org.apache.metamodel:MetaModel-pojo:4.3.5') {
+//        exclude group: 'net.sf.opencsv'
+//    }
+
+    compile files('libs/stanford-ner.jar')
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.5'
+    distributionUrl = "https://services.gradle.org/distributions/gradle-$gradleVersion-all.zip"
+}
